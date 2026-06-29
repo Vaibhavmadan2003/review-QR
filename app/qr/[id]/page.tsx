@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import * as QRCode from 'qrcode';
 
 interface Business {
   id: string;
@@ -19,16 +18,20 @@ export default function QRPage() {
   const params = useParams();
   const businessId = params.id as string;
   const [business, setBusiness] = useState<Business | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [baseUrl, setBaseUrl] = useState('');
 
   useEffect(() => {
+    // Get base URL
+    if (typeof window !== 'undefined') {
+      setBaseUrl(window.location.origin);
+    }
+
     const fetchBusiness = async () => {
       try {
         const res = await fetch(`/api/businesses?id=${businessId}`);
         const data = await res.json();
         setBusiness(data);
       } catch (error) {
-        // Fallback to localStorage
         const saved = localStorage.getItem('businesses');
         if (saved) {
           const businesses = JSON.parse(saved);
@@ -37,44 +40,9 @@ export default function QRPage() {
         }
       }
     };
-    
+
     fetchBusiness();
   }, [businessId]);
-
-  useEffect(() => {
-    if (business && canvasRef.current) {
-      // Get the actual origin - works with IP addresses too
-      const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
-      const host = typeof window !== 'undefined' ? window.location.host : '';
-      const reviewUrl = `${protocol}//${host}/customer/${businessId}`;
-      QRCode.toCanvas(
-        canvasRef.current,
-        reviewUrl,
-        {
-          errorCorrectionLevel: 'H',
-          width: 400,
-          margin: 20,
-          color: {
-            dark: '#000000',
-            light: '#FFFFFF',
-          },
-        },
-        (error) => {
-          if (error) console.error('QR Error:', error);
-        }
-      );
-    }
-  }, [business, businessId]);
-
-  const handleDownload = () => {
-    if (canvasRef.current && business) {
-      const url = canvasRef.current.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = `${business.name}-review-qr.png`;
-      link.href = url;
-      link.click();
-    }
-  };
 
   if (!business) {
     return (
@@ -83,6 +51,24 @@ export default function QRPage() {
       </div>
     );
   }
+
+  const customerUrl = `${baseUrl}/customer/${businessId}`;
+
+  // Generate QR code URL using external service
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(customerUrl)}`;
+
+  const handleDownload = async () => {
+    const response = await fetch(qrCodeUrl);
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${business.name}-review-qr.png`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
@@ -102,14 +88,15 @@ export default function QRPage() {
             Share this QR code with customers
           </p>
 
-          {/* QR Code */}
+          {/* QR Code Display */}
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl p-12 mb-10 text-center border-4 border-blue-200">
-            <canvas
-              ref={canvasRef}
-              className="mx-auto drop-shadow-lg"
+            <img
+              src={qrCodeUrl}
+              alt="QR Code"
+              className="mx-auto drop-shadow-lg rounded-xl w-80 h-80"
             />
             <p className="text-gray-600 text-sm mt-8 font-semibold">
-              Customers will see beautiful review templates when they scan this code
+              Scan this QR code with your phone camera
             </p>
           </div>
 
@@ -166,7 +153,7 @@ export default function QRPage() {
               </div>
               <div className="flex items-start gap-4">
                 <span className="bg-green-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold flex-shrink-0">4</span>
-                <p className="text-gray-700 pt-1">Clicks "Share" → Opens Google Business Profile</p>
+                <p className="text-gray-700 pt-1">Clicks "Leave This Review" → Opens Google Business Profile</p>
               </div>
               <div className="flex items-start gap-4">
                 <span className="bg-green-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold flex-shrink-0">5</span>
@@ -184,6 +171,14 @@ export default function QRPage() {
             >
               👁️ Preview Customer Page
             </Link>
+          </div>
+
+          {/* Direct Link */}
+          <div className="mt-8 pt-8 border-t-2 border-gray-200 text-center">
+            <p className="text-gray-600 mb-4 font-semibold text-sm">Or share this link directly:</p>
+            <div className="bg-gray-100 p-4 rounded-lg break-all">
+              <p className="text-sm text-gray-700 font-mono">{customerUrl}</p>
+            </div>
           </div>
         </div>
       </div>
