@@ -21,12 +21,23 @@ export default function CustomerPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('businesses');
-    if (saved) {
-      const businesses = JSON.parse(saved);
-      const found = businesses.find((b: Business) => b.id === businessId);
-      setBusiness(found);
-    }
+    const fetchBusiness = async () => {
+      try {
+        const res = await fetch(`/api/businesses?id=${businessId}`);
+        const data = await res.json();
+        setBusiness(data);
+      } catch (error) {
+        // Fallback to localStorage
+        const saved = localStorage.getItem('businesses');
+        if (saved) {
+          const businesses = JSON.parse(saved);
+          const found = businesses.find((b: Business) => b.id === businessId);
+          setBusiness(found);
+        }
+      }
+    };
+    
+    fetchBusiness();
   }, [businessId]);
 
   const handleLeaveReview = () => {

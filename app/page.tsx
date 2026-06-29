@@ -40,11 +40,22 @@ export default function Home() {
   });
 
   useEffect(() => {
-    const saved = localStorage.getItem('businesses');
-    if (saved) {
-      setBusinesses(JSON.parse(saved));
-    }
+    fetchBusinesses();
   }, []);
+
+  const fetchBusinesses = async () => {
+    try {
+      const res = await fetch('/api/businesses');
+      const data = await res.json();
+      setBusinesses(Array.isArray(data) ? data : []);
+    } catch (error) {
+      // Fallback to localStorage
+      const saved = localStorage.getItem('businesses');
+      if (saved) {
+        setBusinesses(JSON.parse(saved));
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +75,12 @@ export default function Home() {
             ? { ...b, ...formData, reviews: generatedReviews }
             : b
         );
+        const updatedBusiness = updated.find(b => b.id === editingId);
+        await fetch('/api/businesses', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedBusiness),
+        });
         localStorage.setItem('businesses', JSON.stringify(updated));
         setBusinesses(updated);
         setEditingId(null);
@@ -74,6 +91,11 @@ export default function Home() {
           reviews: generatedReviews,
           createdAt: new Date().toISOString(),
         };
+        await fetch('/api/businesses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newBusiness),
+        });
         const updated = [...businesses, newBusiness];
         localStorage.setItem('businesses', JSON.stringify(updated));
         setBusinesses(updated);
@@ -97,8 +119,9 @@ export default function Home() {
     setShowForm(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Delete this business?')) {
+      await fetch(`/api/businesses?id=${id}`, { method: 'DELETE' });
       const updated = businesses.filter(b => b.id !== id);
       localStorage.setItem('businesses', JSON.stringify(updated));
       setBusinesses(updated);
