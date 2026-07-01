@@ -9,23 +9,11 @@ interface Business {
   description: string;
   googleBusinessUrl: string;
   category: string;
+  customCategory?: string;
+  location: string;
   reviews: string[];
   createdAt: string;
 }
-
-// Generate unique, authentic-sounding reviews based on description
-const generateReviews = (businessName: string, description: string, category: string): string[] => {
-  const reviewTemplates = [
-    `Excellent experience with ${businessName}! Professional team, outstanding service, highly recommend!`,
-    `${businessName} exceeded my expectations. Quick, efficient, and great attention to detail. 5 stars!`,
-    `Best ${category} service in town. The team was courteous and solved the problem perfectly.`,
-    `Very impressed with ${businessName}'s work quality. Completed on time and within budget. Will definitely return!`,
-    `Outstanding customer service! ${businessName} went above and beyond. Highly satisfied with the results.`,
-    `Reliable and trustworthy service. ${businessName} delivered exactly what they promised. Highly recommend to everyone!`,
-  ];
-  
-  return reviewTemplates;
-};
 
 export default function Home() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
@@ -37,6 +25,9 @@ export default function Home() {
     description: '',
     googleBusinessUrl: '',
     category: '',
+    customCategory: '',
+    location: '',
+    batches: 1,
   });
 
   useEffect(() => {
@@ -49,7 +40,6 @@ export default function Home() {
       const data = await res.json();
       setBusinesses(Array.isArray(data) ? data : []);
     } catch (error) {
-      // Fallback to localStorage
       const saved = localStorage.getItem('businesses');
       if (saved) {
         setBusinesses(JSON.parse(saved));
@@ -62,17 +52,36 @@ export default function Home() {
     setLoading(true);
 
     try {
-      // Generate reviews from description
-      const generatedReviews = generateReviews(
-        formData.name,
-        formData.description,
-        formData.category
-      );
+      const categoryToUse = formData.category === 'Other' ? formData.customCategory : formData.category;
+
+      const reviewResponse = await fetch('/api/generate-reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessName: formData.name,
+          category: categoryToUse,
+          description: formData.description,
+          location: formData.location,
+          batches: formData.batches || 1,
+        }),
+      });
+
+      const reviewData = await reviewResponse.json();
+      const generatedReviews = reviewData.reviews || [];
 
       if (editingId) {
         const updated = businesses.map(b =>
           b.id === editingId
-            ? { ...b, ...formData, reviews: generatedReviews }
+            ? { 
+                ...b, 
+                name: formData.name,
+                description: formData.description,
+                googleBusinessUrl: formData.googleBusinessUrl,
+                category: categoryToUse,
+                customCategory: formData.customCategory,
+                location: formData.location,
+                reviews: generatedReviews 
+              }
             : b
         );
         const updatedBusiness = updated.find(b => b.id === editingId);
@@ -87,7 +96,12 @@ export default function Home() {
       } else {
         const newBusiness: Business = {
           id: Date.now().toString(),
-          ...formData,
+          name: formData.name,
+          description: formData.description,
+          googleBusinessUrl: formData.googleBusinessUrl,
+          category: categoryToUse,
+          customCategory: formData.customCategory,
+          location: formData.location,
           reviews: generatedReviews,
           createdAt: new Date().toISOString(),
         };
@@ -101,7 +115,7 @@ export default function Home() {
         setBusinesses(updated);
       }
 
-      setFormData({ name: '', description: '', googleBusinessUrl: '', category: '' });
+      setFormData({ name: '', description: '', googleBusinessUrl: '', category: '', customCategory: '', location: '', batches: 1 });
       setShowForm(false);
     } finally {
       setLoading(false);
@@ -113,7 +127,9 @@ export default function Home() {
       name: business.name,
       description: business.description,
       googleBusinessUrl: business.googleBusinessUrl,
-      category: business.category,
+      category: business.category === business.customCategory ? 'Other' : business.category,
+      customCategory: business.customCategory || '',
+      location: business.location,
     });
     setEditingId(business.id);
     setShowForm(true);
@@ -129,27 +145,51 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600">
-      <div className="container mx-auto px-4 py-16">
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '64px 16px'
+    }}>
+      <div style={{ maxWidth: '80rem', margin: '0 auto' }}>
         {/* Header */}
-        <div className="text-center mb-16">
-          <div className="inline-block bg-white/20 backdrop-blur-lg rounded-full px-6 py-3 mb-6">
-            <span className="text-white text-sm font-semibold">⭐ Smart Review Management</span>
+        <div style={{ textAlign: 'center', marginBottom: '64px' }}>
+          <div style={{
+            display: 'inline-block',
+            background: 'rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '9999px',
+            padding: '12px 24px',
+            marginBottom: '24px'
+          }}>
+            <span style={{ color: 'white', fontSize: '14px', fontWeight: 'bold' }}>⭐ Smart Review Management</span>
           </div>
-          <h1 className="text-6xl font-black text-white mb-4 drop-shadow-lg">
+          <h1 style={{ fontSize: '56px', fontWeight: 900, color: 'white', marginBottom: '16px', textShadow: '0 2px 10px rgba(0,0,0,0.2)' }}>
             Review Genius
           </h1>
-          <p className="text-xl text-white/90 max-w-2xl mx-auto drop-shadow-md">
-            Auto-generate authentic reviews. Add business → Get QR → Customers leave reviews instantly!
+          <p style={{ fontSize: '18px', color: 'rgba(255, 255, 255, 0.9)', maxWidth: '42rem', margin: '0 auto' }}>
+            Auto-generate AI-powered reviews. Add business → Get QR → Customers leave reviews instantly!
           </p>
         </div>
 
         {/* Add Business Button */}
         {!showForm && (
-          <div className="text-center mb-12">
+          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
             <button
               onClick={() => setShowForm(true)}
-              className="bg-white text-indigo-600 px-10 py-4 rounded-full font-black text-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 shadow-lg"
+              style={{
+                background: 'white',
+                color: '#667eea',
+                padding: '16px 40px',
+                borderRadius: '9999px',
+                fontWeight: 900,
+                fontSize: '18px',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-4px)')}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
             >
               + Add New Business
             </button>
@@ -158,13 +198,20 @@ export default function Home() {
 
         {/* Form */}
         {showForm && (
-          <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-2xl mx-auto mb-12">
-            <h2 className="text-3xl font-black text-gray-800 mb-8">
+          <div style={{
+            background: 'white',
+            borderRadius: '24px',
+            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)',
+            padding: '40px',
+            maxWidth: '42rem',
+            margin: '0 auto 48px'
+          }}>
+            <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#1f2937', marginBottom: '32px' }}>
               {editingId ? '✏️ Edit Business' : '➕ Add New Business'}
             </h2>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div>
-                <label className="block text-gray-700 font-bold mb-3">
+                <label style={{ display: 'block', color: '#374151', fontWeight: 'bold', marginBottom: '8px' }}>
                   Business Name *
                 </label>
                 <input
@@ -172,13 +219,20 @@ export default function Home() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
-                  className="w-full px-5 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-600 focus:outline-none text-lg"
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
+                  }}
                   placeholder="e.g., ABC Plumbing Services"
                 />
               </div>
 
               <div>
-                <label className="block text-gray-700 font-bold mb-3">
+                <label style={{ display: 'block', color: '#374151', fontWeight: 'bold', marginBottom: '8px' }}>
                   Business Description *
                 </label>
                 <textarea
@@ -186,34 +240,57 @@ export default function Home() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   required
                   rows={4}
-                  className="w-full px-5 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-600 focus:outline-none text-lg resize-none"
-                  placeholder="Describe your business, services, expertise... (Used to generate reviews)"
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    resize: 'none',
+                    boxSizing: 'border-box',
+                    fontFamily: 'inherit'
+                  }}
+                  placeholder="Describe your business, services, expertise..."
                 />
               </div>
 
               <div>
-                <label className="block text-gray-700 font-bold mb-3">
-                  Google Business URL *
+                <label style={{ display: 'block', color: '#374151', fontWeight: 'bold', marginBottom: '8px' }}>
+                  Business Location *
                 </label>
                 <input
-                  type="url"
-                  value={formData.googleBusinessUrl}
-                  onChange={(e) => setFormData({ ...formData, googleBusinessUrl: e.target.value })}
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   required
-                  className="w-full px-5 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-600 focus:outline-none text-lg"
-                  placeholder="https://www.google.com/maps/place/..."
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
+                  }}
+                  placeholder="e.g., New York, NYC or Sector 5, Gurugram"
                 />
               </div>
 
               <div>
-                <label className="block text-gray-700 font-bold mb-3">
+                <label style={{ display: 'block', color: '#374151', fontWeight: 'bold', marginBottom: '8px' }}>
                   Category *
                 </label>
                 <select
                   value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value, customCategory: '' })}
                   required
-                  className="w-full px-5 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-600 focus:outline-none text-lg"
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
+                  }}
                 >
                   <option value="">Select Category</option>
                   <option value="Plumbing">Plumbing</option>
@@ -224,15 +301,99 @@ export default function Home() {
                   <option value="Restaurant">Restaurant</option>
                   <option value="Repair">Repair Services</option>
                   <option value="Construction">Construction</option>
+                  <option value="Astrologer">Astrologer</option>
+                  <option value="Tarot Reading">Tarot Reading</option>
                   <option value="Other">Other</option>
                 </select>
               </div>
 
-              <div className="flex gap-4 pt-6">
+              {formData.category === 'Other' && (
+                <div>
+                  <label style={{ display: 'block', color: '#374151', fontWeight: 'bold', marginBottom: '8px' }}>
+                    Specify Your Category *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.customCategory}
+                    onChange={(e) => setFormData({ ...formData, customCategory: e.target.value })}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: '2px solid #667eea',
+                      borderRadius: '12px',
+                      fontSize: '16px',
+                      boxSizing: 'border-box'
+                    }}
+                    placeholder="e.g., Pet Grooming, Web Development, etc."
+                  />
+                </div>
+              )}
+
+              <div>
+                <label style={{ display: 'block', color: '#374151', fontWeight: 'bold', marginBottom: '8px' }}>
+                  Google Business URL *
+                </label>
+                <input
+                  type="url"
+                  value={formData.googleBusinessUrl}
+                  onChange={(e) => setFormData({ ...formData, googleBusinessUrl: e.target.value })}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
+                  }}
+                  placeholder="https://www.google.com/maps/place/..."
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', color: '#374151', fontWeight: 'bold', marginBottom: '8px' }}>
+                  Number of Batches (20 reviews per batch) *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  value={formData.batches}
+                  onChange={(e) => setFormData({ ...formData, batches: parseInt(e.target.value) || 1 })}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #667eea',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>
+                  1 batch = 20 reviews | 2 batches = 40 reviews | 3 batches = 60 reviews (max 5)
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-bold hover:shadow-lg transition-all transform hover:-translate-y-1 disabled:opacity-50 text-lg"
+                  style={{
+                    flex: 1,
+                    background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                    color: 'white',
+                    padding: '16px 24px',
+                    borderRadius: '12px',
+                    fontWeight: 'bold',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    opacity: loading ? 0.5 : 1,
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => !loading && (e.currentTarget.style.transform = 'translateY(-2px)')}
+                  onMouseLeave={(e) => !loading && (e.currentTarget.style.transform = 'translateY(0)')}
                 >
                   {loading ? '⏳ Generating...' : editingId ? '✓ Update' : '✓ Add & Generate'}
                 </button>
@@ -241,9 +402,22 @@ export default function Home() {
                   onClick={() => {
                     setShowForm(false);
                     setEditingId(null);
-                    setFormData({ name: '', description: '', googleBusinessUrl: '', category: '' });
+                    setFormData({ name: '', description: '', googleBusinessUrl: '', category: '', customCategory: '', location: '', batches: 1 });
                   }}
-                  className="flex-1 bg-gray-300 text-gray-800 py-4 rounded-xl font-bold hover:bg-gray-400 transition-colors text-lg"
+                  style={{
+                    flex: 1,
+                    background: '#e5e7eb',
+                    color: '#374151',
+                    padding: '16px 24px',
+                    borderRadius: '12px',
+                    fontWeight: 'bold',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#d1d5db')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = '#e5e7eb')}
                 >
                   Cancel
                 </button>
@@ -253,55 +427,130 @@ export default function Home() {
         )}
 
         {/* Businesses Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+          gap: '32px'
+        }}>
           {businesses.map((business) => (
             <div
               key={business.id}
-              className="bg-white rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-all transform hover:-translate-y-2"
+              style={{
+                background: 'white',
+                borderRadius: '24px',
+                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+                overflow: 'hidden',
+                transition: 'all 0.3s ease',
+                transform: 'translateY(0)'
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-8px)')}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
             >
-              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-8 py-8">
-                <h3 className="text-2xl font-black text-white mb-2">
+              <div style={{
+                background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                padding: '32px 24px',
+                color: 'white'
+              }}>
+                <h3 style={{ fontSize: '22px', fontWeight: 900, marginBottom: '8px' }}>
                   {business.name}
                 </h3>
-                <p className="text-indigo-100 text-sm font-semibold">
+                <p style={{ fontSize: '14px', opacity: 0.9 }}>
                   {business.category}
+                </p>
+                <p style={{ fontSize: '12px', opacity: 0.8, marginTop: '4px' }}>
+                  📍 {business.location}
                 </p>
               </div>
 
-              <div className="p-8 space-y-6">
-                <div className="bg-yellow-50 rounded-xl p-4 text-center">
-                  <p className="text-gray-600 text-sm mb-1">Auto-Generated Reviews</p>
-                  <p className="text-4xl font-black text-yellow-600">
+              <div style={{ padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{
+                  background: '#fef3c7',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <p style={{ color: '#92400e', fontSize: '12px', marginBottom: '4px' }}>AI-Generated Reviews</p>
+                  <p style={{ color: '#d97706', fontSize: '32px', fontWeight: 900 }}>
                     {business.reviews.length}
                   </p>
                 </div>
 
-                <div className="space-y-3">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <Link
                     href={`/customer/${business.id}`}
-                    className="block w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl text-center font-bold hover:shadow-lg transition-all transform hover:-translate-y-1"
+                    style={{
+                      display: 'block',
+                      background: 'linear-gradient(135deg, #10b981, #059669)',
+                      color: 'white',
+                      padding: '12px 24px',
+                      borderRadius: '12px',
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                      textDecoration: 'none',
+                      transition: 'all 0.3s ease',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
                   >
                     👁️ Customer Page
                   </Link>
 
                   <Link
                     href={`/qr/${business.id}`}
-                    className="block w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-xl text-center font-bold hover:shadow-lg transition-all transform hover:-translate-y-1"
+                    style={{
+                      display: 'block',
+                      background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                      color: 'white',
+                      padding: '12px 24px',
+                      borderRadius: '12px',
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                      textDecoration: 'none',
+                      transition: 'all 0.3s ease',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
                   >
                     📱 Get QR Code
                   </Link>
 
-                  <div className="flex gap-2">
+                  <div style={{ display: 'flex', gap: '12px' }}>
                     <button
                       onClick={() => handleEdit(business)}
-                      className="flex-1 bg-yellow-500 text-white py-2 rounded-lg font-bold hover:bg-yellow-600 transition-colors"
+                      style={{
+                        flex: 1,
+                        background: '#f59e0b',
+                        color: 'white',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        fontWeight: 'bold',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'background 0.3s ease'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#d97706')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = '#f59e0b')}
                     >
                       ✏️ Edit
                     </button>
 
                     <button
                       onClick={() => handleDelete(business.id)}
-                      className="flex-1 bg-red-500 text-white py-2 rounded-lg font-bold hover:bg-red-600 transition-colors"
+                      style={{
+                        flex: 1,
+                        background: '#ef4444',
+                        color: 'white',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        fontWeight: 'bold',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'background 0.3s ease'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#dc2626')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = '#ef4444')}
                     >
                       🗑️ Delete
                     </button>
@@ -313,10 +562,10 @@ export default function Home() {
         </div>
 
         {businesses.length === 0 && !showForm && (
-          <div className="text-center py-20">
-            <p className="text-6xl mb-6">📱</p>
-            <p className="text-3xl font-bold text-white mb-4">No businesses yet</p>
-            <p className="text-xl text-white/80">Add your first business to start!</p>
+          <div style={{ textAlign: 'center', paddingTop: '80px', paddingBottom: '80px' }}>
+            <p style={{ fontSize: '56px', marginBottom: '24px' }}>📱</p>
+            <p style={{ fontSize: '32px', fontWeight: 'bold', color: 'white', marginBottom: '16px' }}>No businesses yet</p>
+            <p style={{ fontSize: '18px', color: 'rgba(255, 255, 255, 0.8)' }}>Add your first business to start!</p>
           </div>
         )}
       </div>
