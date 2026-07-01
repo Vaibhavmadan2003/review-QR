@@ -117,52 +117,6 @@ export default function QRPage() {
   const customerUrl = `${baseUrl}/customer/${businessId}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(customerUrl)}`;
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
-        return;
-      }
-      setUploading(true);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setUploadedLogo(event.target?.result as string);
-        setUploading(false);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    const files = e.dataTransfer?.files;
-    if (files?.[0]) {
-      const file = files[0];
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          setUploadedLogo(event.target?.result as string);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        alert('Please drop an image file');
-      }
-    }
-  };
-
   const handleDownloadTemplate = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;

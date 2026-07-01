@@ -130,6 +130,7 @@ export default function Home() {
       category: business.category === business.customCategory ? 'Other' : business.category,
       customCategory: business.customCategory || '',
       location: business.location,
+      batches: 1,
     });
     setEditingId(business.id);
     setShowForm(true);
