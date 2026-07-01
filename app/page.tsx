@@ -36,14 +36,27 @@ export default function Home() {
 
   const fetchBusinesses = async () => {
     try {
-      const res = await fetch('/api/businesses');
-      const data = await res.json();
-      setBusinesses(Array.isArray(data) ? data : []);
-    } catch (error) {
+      // Always check localStorage first as primary source
       const saved = localStorage.getItem('businesses');
       if (saved) {
-        setBusinesses(JSON.parse(saved));
+        const parsedBusinesses = JSON.parse(saved);
+        setBusinesses(Array.isArray(parsedBusinesses) ? parsedBusinesses : []);
       }
+
+      // Try to fetch from API as well for sync
+      try {
+        const res = await fetch('/api/businesses');
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setBusinesses(data);
+          localStorage.setItem('businesses', JSON.stringify(data));
+        }
+      } catch (apiError) {
+        // If API fails, keep using localStorage
+        console.log('API fetch failed, using localStorage');
+      }
+    } catch (error) {
+      console.error('Error fetching businesses:', error);
     }
   };
 
