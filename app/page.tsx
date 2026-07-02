@@ -36,24 +36,25 @@ export default function Home() {
 
   const fetchBusinesses = async () => {
     try {
-      // Always check localStorage first as primary source
+      // Try Firebase/API first (PRIMARY SOURCE)
+      try {
+        const res = await fetch('/api/businesses');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setBusinesses(data);
+          // Sync to localStorage as backup
+          localStorage.setItem('businesses', JSON.stringify(data));
+          return;
+        }
+      } catch (apiError) {
+        console.log('API fetch failed, falling back to localStorage');
+      }
+
+      // Fallback to localStorage if API fails
       const saved = localStorage.getItem('businesses');
       if (saved) {
         const parsedBusinesses = JSON.parse(saved);
         setBusinesses(Array.isArray(parsedBusinesses) ? parsedBusinesses : []);
-      }
-
-      // Try to fetch from API as well for sync
-      try {
-        const res = await fetch('/api/businesses');
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setBusinesses(data);
-          localStorage.setItem('businesses', JSON.stringify(data));
-        }
-      } catch (apiError) {
-        // If API fails, keep using localStorage
-        console.log('API fetch failed, using localStorage');
       }
     } catch (error) {
       console.error('Error fetching businesses:', error);

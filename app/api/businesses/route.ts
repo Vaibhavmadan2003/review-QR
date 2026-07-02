@@ -1,51 +1,100 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getDatabase } from '@/app/lib/firebase-admin';
 
-// Simple in-memory storage (Vercel will reset on redeploy, but works for demo)
-const businesses: Record<string, any> = {};
-
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
-
-  if (id) {
-    // Get single business
-    return NextResponse.json(businesses[id] || null);
-  }
-
-  // Get all businesses
-  return NextResponse.json(Object.values(businesses));
+interface Business {
+  id: string;
+  name: string;
+  description: string;
+  googleBusinessUrl: string;
+  category: string;
+  customCategory?: string;
+  location: string;
+  reviews: string[];
+  createdAt: string;
 }
 
-export async function POST(request: Request) {
-  const data = await request.json();
-  
-  if (!data.id) {
-    return NextResponse.json({ error: 'Missing ID' }, { status: 400 });
-  }
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const businessId = searchParams.get('id');
 
-  businesses[data.id] = data;
-  return NextResponse.json({ success: true, business: data });
+    const db = getDatabase();
+
+    if (businessId) {
+      // Get single business
+      const snapshot = await db.ref(`businesses/${businessId}`).get();
+      if (snapshot.exists()) {
+        return NextResponse.json(snapshot.val());
+      }
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
+    // Get all businesses
+    const snapshot = await db.ref('businesses').get();
+    if (snapshot.exists()) {
+      const businesses = snapshot.val();
+      const businessArray = Object.values(businesses) as Business[];
+      return NextResponse.json(businessArray);
+    }
+
+    return NextResponse.json([]);
+  } catch (error) {
+    console.error('Error fetching businesses:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }
 
-export async function PUT(request: Request) {
-  const data = await request.json();
-  
-  if (!data.id) {
-    return NextResponse.json({ error: 'Missing ID' }, { status: 400 });
-  }
+export async function POST(request: NextRequest) {
+  try {
+    const business: Business = await request.json();
 
-  businesses[data.id] = { ...businesses[data.id], ...data };
-  return NextResponse.json({ success: true, business: businesses[data.id] });
+    if (!business.id || !business.name) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const db = getDatabase();
+    await db.ref(`businesses/${business.id}`).set(business);
+
+    return NextResponse.json({ success: true, business });
+  } catch (error) {
+    console.error('Error creating business:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }
 
-export async function DELETE(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
+export async function PUT(request: NextRequest) {
+  try {
+    const business: Business = await request.json();
 
-  if (!id) {
-    return NextResponse.json({ error: 'Missing ID' }, { status: 400 });
+    if (!business.id) {
+      return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+    }
+
+    const db = getDatabase();
+    await db.ref(`businesses/${business.id}`).update(business);
+
+    return NextResponse.json({ success: true, business });
+  } catch (error) {
+    console.error('Error updating business:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
+}
 
-  delete businesses[id];
-  return NextResponse.json({ success: true });
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const businessId = searchParams.get('id');
+
+    if (!businessId) {
+      return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+    }
+
+    const db = getDatabase();
+    await db.ref(`businesses/${businessId}`).remove();
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting business:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

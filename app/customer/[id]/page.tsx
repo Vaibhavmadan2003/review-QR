@@ -24,36 +24,38 @@ export default function CustomerPage() {
   useEffect(() => {
     const fetchBusiness = async () => {
       try {
-        // Check localStorage first - PRIMARY SOURCE
+        // Try API/Firebase first (PRIMARY SOURCE)
+        try {
+          const res = await fetch(`/api/businesses?id=${businessId}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.id) {
+              setBusiness(data);
+              // Save to localStorage as backup
+              const savedList = localStorage.getItem('businesses') || '[]';
+              const businesses = JSON.parse(savedList);
+              const idx = businesses.findIndex((b: Business) => b.id === businessId);
+              if (idx >= 0) {
+                businesses[idx] = data;
+              } else {
+                businesses.push(data);
+              }
+              localStorage.setItem('businesses', JSON.stringify(businesses));
+              return; // Success, exit
+            }
+          }
+        } catch (apiError) {
+          console.log('API unavailable, checking localStorage');
+        }
+
+        // Fallback to localStorage if API fails
         const saved = localStorage.getItem('businesses');
         if (saved) {
           const businesses = JSON.parse(saved);
           const found = businesses.find((b: Business) => b.id === businessId);
           if (found) {
             setBusiness(found);
-            return; // Found in localStorage, use it
           }
-        }
-
-        // Fallback to API if not in localStorage
-        try {
-          const res = await fetch(`/api/businesses?id=${businessId}`);
-          const data = await res.json();
-          if (data && data.id) {
-            setBusiness(data);
-            // Save to localStorage
-            const savedList = localStorage.getItem('businesses') || '[]';
-            const businesses = JSON.parse(savedList);
-            const idx = businesses.findIndex((b: Business) => b.id === businessId);
-            if (idx >= 0) {
-              businesses[idx] = data;
-            } else {
-              businesses.push(data);
-            }
-            localStorage.setItem('businesses', JSON.stringify(businesses));
-          }
-        } catch (apiError) {
-          console.log('API unavailable, using localStorage');
         }
       } catch (error) {
         console.error('Error fetching business:', error);
