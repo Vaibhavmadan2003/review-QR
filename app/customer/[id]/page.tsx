@@ -14,10 +14,21 @@ interface Business {
   createdAt: string;
 }
 
+// Fisher-Yates shuffle algorithm
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
 export default function CustomerPage() {
   const params = useParams();
   const businessId = params.id as string;
   const [business, setBusiness] = useState<Business | null>(null);
+  const [shuffledReviews, setShuffledReviews] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [copied, setCopied] = useState(false);
 
@@ -31,6 +42,8 @@ export default function CustomerPage() {
             const data = await res.json();
             if (data && data.id) {
               setBusiness(data);
+              // Shuffle reviews on every page load
+              setShuffledReviews(shuffleArray(data.reviews));
               // Save to localStorage as backup
               const savedList = localStorage.getItem('businesses') || '[]';
               const businesses = JSON.parse(savedList);
@@ -55,6 +68,8 @@ export default function CustomerPage() {
           const found = businesses.find((b: Business) => b.id === businessId);
           if (found) {
             setBusiness(found);
+            // Shuffle reviews on every page load
+            setShuffledReviews(shuffleArray(found.reviews));
           }
         }
       } catch (error) {
@@ -68,8 +83,8 @@ export default function CustomerPage() {
   }, [businessId]);
 
   const handleLeaveReview = () => {
-    if (business) {
-      navigator.clipboard.writeText(business.reviews[selectedIndex]);
+    if (business && shuffledReviews.length > 0) {
+      navigator.clipboard.writeText(shuffledReviews[selectedIndex]);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
       setTimeout(() => {
@@ -79,11 +94,11 @@ export default function CustomerPage() {
   };
 
   const handlePrevious = () => {
-    setSelectedIndex(prev => (prev === 0 ? business!.reviews.length - 1 : prev - 1));
+    setSelectedIndex(prev => (prev === 0 ? shuffledReviews.length - 1 : prev - 1));
   };
 
   const handleNext = () => {
-    setSelectedIndex(prev => (prev === business!.reviews.length - 1 ? 0 : prev + 1));
+    setSelectedIndex(prev => (prev === shuffledReviews.length - 1 ? 0 : prev + 1));
   };
 
   if (!business) {
@@ -133,7 +148,7 @@ export default function CustomerPage() {
             ⭐⭐⭐⭐⭐
           </div>
           <p style={{ fontSize: '18px', color: '#374151', fontWeight: '600' }}>
-            {business.reviews.length} Beautiful, Authentic Customer Reviews
+            {shuffledReviews.length} Beautiful, Authentic Customer Reviews
           </p>
         </div>
       </section>
@@ -160,7 +175,7 @@ export default function CustomerPage() {
                   fontWeight: 'bold',
                   border: '1px solid rgba(255, 255, 255, 0.4)'
                 }}>
-                  Review {selectedIndex + 1} / {business.reviews.length}
+                  Review {selectedIndex + 1} / {shuffledReviews.length}
                 </span>
               </div>
 
@@ -172,7 +187,7 @@ export default function CustomerPage() {
                 fontStyle: 'italic',
                 textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
               }}>
-                "{business.reviews[selectedIndex]}"
+                "{shuffledReviews[selectedIndex]}"
               </p>
 
               <button
@@ -227,7 +242,7 @@ export default function CustomerPage() {
               </button>
 
               <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', flex: 1, maxWidth: '42rem', padding: '8px' }}>
-                {business.reviews.map((_, index) => (
+                {shuffledReviews.map((_, index) => (
                   <button
                     key={index}
                     onClick={() => setSelectedIndex(index)}
@@ -286,7 +301,7 @@ export default function CustomerPage() {
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
             gap: '24px'
           }}>
-            {business.reviews.slice(0, 6).map((review, index) => (
+            {shuffledReviews.slice(0, 6).map((review, index) => (
               <div
                 key={index}
                 onClick={() => setSelectedIndex(index)}
@@ -479,21 +494,9 @@ export default function CustomerPage() {
           <p style={{ color: '#6b7280', marginBottom: '32px' }}>
             Your feedback drives our passion for excellence
           </p>
-          <Link
-            href="/"
-            style={{
-              display: 'inline-block',
-              color: '#ec4899',
-              textDecoration: 'none',
-              fontWeight: 'bold',
-              fontSize: '18px',
-              transition: 'color 0.3s ease'
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = '#be185d')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = '#ec4899')}
-          >
-            ← Back to Dashboard
-          </Link>
+          <p style={{ fontSize: '14px', color: '#9ca3af', marginTop: '32px' }}>
+            Powered by Review Genius
+          </p>
         </div>
       </section>
 
